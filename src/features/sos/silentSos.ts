@@ -1,3 +1,4 @@
+import { api } from "@/lib/api"
 import { contactNames, contactsStrictlyWithRole } from "@/lib/contacts"
 import { getLocation, vibrate } from "@/lib/device"
 import { mapsLink } from "@/lib/format"
@@ -14,5 +15,14 @@ export async function silentSos(contacts: Contact[], profile: Profile) {
     recipients: contactNames(contactsStrictlyWithRole(contacts, "SOS recipient")),
     location: coords,
   })
+  if (api.getToken()) {
+    api
+      .post("/sos", {
+        lat: coords?.lat ?? null,
+        lng: coords?.lng ?? null,
+        message: "Discreet SOS triggered.",
+      })
+      .catch(() => {})
+  }
   vibrate([80, 60, 80])
 }

@@ -20,6 +20,8 @@ export type SharingSession = {
   status: SharingStatus
   endsAt: number | null
   startedAt: number
+  publicToken?: string
+  publicTrackingUrl?: string
 }
 
 export type JourneyHistory = { id: number; route: string; date: string; endedAt?: number }

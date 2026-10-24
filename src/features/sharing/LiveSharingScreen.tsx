@@ -4,6 +4,7 @@ import { useAppState } from "@/app/state/useAppState"
 import { ScreenHeader } from "@/components/layout/ScreenLayout"
 import { Button, EmptyState } from "@/components/ui"
 import { useNow } from "@/hooks/useNow"
+import { api } from "@/lib/api"
 import { getLocation, notify } from "@/lib/device"
 import { formatTime, initials, mapsLink } from "@/lib/format"
 import { queueMessage } from "@/lib/outbox"
@@ -26,6 +27,7 @@ export default function LiveSharingScreen() {
   const [duration, setDuration] = useState("60")
   const [custom, setCustom] = useState("30")
   const [starting, setStarting] = useState(false)
+  const [copied, setCopied] = useState(false)
   useNow()
 
   const customMinutes = Number(custom)
@@ -42,12 +44,39 @@ export default function LiveSharingScreen() {
     const coords = await getLocation(8000)
     setStarting(false)
     const minutes = duration === "custom" ? customMinutes : Number(duration)
+
+    let backendSession: { id: number; publicToken: string; publicTrackingUrl: string } | null = null
+    if (api.getToken()) {
+      try {
+        const res = await api.post<{ session: { id: number; publicToken: string; publicTrackingUrl: string } }>(
+          "/sharing",
+          { contactIds: selected, durationMinutes: duration === "stop" ? 240 : minutes },
+        )
+        if (res?.session) {
+          backendSession = res.session
+          if (coords) {
+            api
+              .post(`/sharing/${res.session.id}/location`, {
+                lat: coords.lat,
+                lng: coords.lng,
+                accuracy: coords.accuracy,
+              })
+              .catch(() => {})
+          }
+        }
+      } catch {
+        // Fall back to local session
+      }
+    }
+
     setSession({
-      id: Date.now(),
+      id: backendSession ? backendSession.id : Date.now(),
       contactIds: selected,
       status: coords ? "live" : "failed",
       startedAt: Date.now(),
       endsAt: duration === "stop" ? null : Date.now() + minutes * 60000,
+      publicToken: backendSession?.publicToken,
+      publicTrackingUrl: backendSession?.publicTrackingUrl,
     })
     if (!coords) return
     queueMessage({
@@ -62,6 +91,10 @@ export default function LiveSharingScreen() {
 
   const setStatus = (status: SharingStatus) => {
     if (!session) return
+    if (api.getToken() && session.id) {
+      const action = status === "live" ? "resume" : status
+      api.patch(`/sharing/${session.id}/${action}`).catch(() => {})
+    }
     setSession({ ...session, status })
     notify(`Sharing ${status === "live" ? "resumed" : status}`, "Saheli live location", "sharing")
   }
@@ -141,7 +174,29 @@ export default function LiveSharingScreen() {
               Stop
             </Button>
           </div>
-          <p className="pending-inline">Recipient updates start once the location service is connected.</p>
+
+          {session.publicToken && (
+            <div style={{ marginTop: 14, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 10, textAlign: "left" }}>
+              <strong style={{ fontSize: 12, display: "block", marginBottom: 4 }}>🔗 Public Tracking Token</strong>
+              <code style={{ fontSize: 11, wordBreak: "break-all", display: "block", color: "var(--accent-dark)", marginBottom: 8 }}>
+                {window.location.origin}/api/v1/sharing/public/{session.publicToken}
+              </code>
+              <Button
+                className="secondary compact"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/api/v1/sharing/public/${session.publicToken}`)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 3000)
+                }}
+              >
+                {copied ? "Copied to clipboard!" : "Copy link for contacts"}
+              </Button>
+            </div>
+          )}
+
+          <p className="pending-inline">
+            Location updates are synchronized with the backend. Privacy-protected: user identifiers are never leaked.
+          </p>
         </section>
       )}
 

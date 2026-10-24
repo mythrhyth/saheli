@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useNavigation } from "@/app/navigation/useNavigation"
 import { Button } from "@/components/ui"
 import { STORAGE_KEYS } from "@/config/constants"
+import { api } from "@/lib/api"
 import { formatTime } from "@/lib/format"
 import { readJSON, writeJSON } from "@/lib/storage"
 import { SUGGESTED_PROMPTS, getAnswer, type AssistantContext } from "./answers"
@@ -9,7 +10,6 @@ import { SUGGESTED_PROMPTS, getAnswer, type AssistantContext } from "./answers"
 type ChatMessage = { id: number; from: "user" | "assistant"; text: string; sources?: string[] }
 
 const MAX_MESSAGES = 60
-const RESPONSE_DELAY_MS = 650
 const GREETING: ChatMessage = {
   id: 1,
   from: "assistant",
@@ -55,7 +55,7 @@ export default function AssistantScreen() {
     ["location", "Location on", "Device"],
   ]
 
-  const send = (value = input) => {
+  const send = async (value = input) => {
     const prompt = value.trim()
     if (!prompt || loading) return
     setInput("")
@@ -63,16 +63,34 @@ export default function AssistantScreen() {
     setFailed(false)
     setMessages((m) => [...m, { id: Date.now(), from: "user", text: prompt }])
     setLoading(true)
-    window.setTimeout(() => {
+
+    try {
+      const data = await api.post<{
+        text: string
+        sources: string[]
+        provider: string
+        disclaimer: string
+      }>("/assistant", { prompt, context })
+
+      setMessages((m) => [
+        ...m,
+        {
+          id: Date.now() + 1,
+          from: "assistant",
+          text: data.text,
+          sources: data.sources && data.sources.length ? data.sources : ["Saheli Heuristic Assistant"],
+        },
+      ])
+    } catch {
       try {
         const reply = getAnswer(prompt, context)
         setMessages((m) => [...m, { id: Date.now() + 1, from: "assistant", ...reply }])
       } catch {
         setFailed(true)
-      } finally {
-        setLoading(false)
       }
-    }, RESPONSE_DELAY_MS)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

@@ -1,0 +1,193 @@
+// Prisma schema for Saheli Women's Safety Backend
+// Designed for seamless transition from SQLite (local dev) to PostgreSQL (production)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              Int               @id @default(autoincrement())
+  phone           String            @unique
+  name            String            @default("")
+  city            String            @default("")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relations
+  preference      UserPreference?
+  contacts        EmergencyContact[]
+  checkins        CheckInSession[]
+  sharingSessions SharingSession[]
+  messages        EmergencyMessage[]
+  journeys        Journey[]
+  reports         SafetyReport[]
+}
+
+model UserPreference {
+  id                      Int      @id @default(autoincrement())
+  userId                  Int      @unique
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emergencyCountdown      Int      @default(10)
+  emergencyIncludeLocation Boolean @default(true)
+  emergencyRepeatMins     Int      @default(5)
+  emergencyMessage        String   @default("I need help. This is an SOS alert from Saheli.")
+  emergencyShowCall112    Boolean  @default(true)
+  notifCheckin            Boolean  @default(true)
+  notifSharing            Boolean  @default(true)
+  notifAlerts             Boolean  @default(true)
+  notifReports            Boolean  @default(true)
+  updatedAt               DateTime @updatedAt
+}
+
+model OtpVerification {
+  id               Int      @id @default(autoincrement())
+  phone            String
+  codeHash         String
+  attempts         Int      @default(0)
+  maxAttempts      Int      @default(3)
+  resendAvailableAt DateTime
+  expiresAt        DateTime
+  consumed         Boolean  @default(false)
+  createdAt        DateTime @default(now())
+}
+
+model EmergencyContact {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  relation    String
+  phone       String
+  roles       String   // Stored as JSON string to support both SQLite and PostgreSQL without array migration issues
+  escalation  String   @default("Notify after 5 minutes")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CheckInSession {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label           String    @default("Check-in")
+  intervalMinutes Int       @default(15)
+  graceMinutes    Int       @default(5)
+  startedAt       DateTime  @default(now())
+  dueAt           DateTime
+  graceDueAt      DateTime
+  status          String    @default("running") // running | completed | missed | escalated
+  escalatedAt     DateTime?
+  completedAt     DateTime?
+}
+
+model SharingSession {
+  id          Int               @id @default(autoincrement())
+  userId      Int
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publicToken String            @unique
+  contactIds  String            // Stored as JSON array string: "[1, 2]"
+  status      String            @default("live") // live | paused | ended
+  startedAt   DateTime          @default(now())
+  endsAt      DateTime?
+  locations   SharingLocation[]
+}
+
+model SharingLocation {
+  id         Int            @id @default(autoincrement())
+  sessionId  Int
+  session    SharingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  lat        Float
+  lng        Float
+  accuracy   Float?
+  recordedAt DateTime       @default(now())
+}
+
+model EmergencyMessage {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind         String   // sos | checkin-safe | checkin-missed | disaster-safe | disaster-help | test | report
+  title        String
+  body         String
+  recipients   String   // JSON array of strings
+  lat          Float?
+  lng          Float?
+  status       String   @default("queued") // queued | mock_delivered | delivered | failed
+  deliveryMode String   @default("mock")   // mock | carrier
+  createdAt    DateTime @default(now())
+}
+
+model Journey {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  origin      String
+  destination String
+  route       String
+  mode        String    // Walk | Bus | Taxi | Auto
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+}
+
+model SafetyReport {
+  id              Int      @id @default(autoincrement())
+  userId          Int?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  category        String
+  area            String
+  whenDescription String
+  detail          String
+  anonymous       Boolean  @default(false)
+  lat             Float?
+  lng             Float?
+  status          String   @default("pending") // pending | approved | rejected
+  createdAt       DateTime @default(now())
+}
+
+model AreaSafetyData {
+  id                Int      @id @default(autoincrement())
+  name              String   @unique
+  tone              String   // limited | caution | supported
+  coverage          String
+  lightingScore     Float    @default(0) // 0 to 1
+  transportScore    Float    @default(0) // 0 to 1
+  publicPlacesCount Int      @default(0)
+  hazardNote        String?
+  confidence        String   @default("Limited") // High | Moderate | Limited | Unknown
+  isSample          Boolean  @default(true)      // Clearly separates sample data from live data
+  updatedAt         DateTime @updatedAt
+}
+
+model Shelter {
+  id          Int      @id @default(autoincrement())
+  name        String
+  type        String
+  status      String   // Confirmed | Reported | Unknown
+  distanceKm  Float
+  area        String
+  womenOnly   Boolean  @default(false)
+  accessible  Boolean  @default(false)
+  open24      Boolean  @default(false)
+  facilities  String   // JSON string array of facilities
+  phone       String?
+  accessNotes String?
+  isSample    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model DisasterAlert {
+  id          Int      @id @default(autoincrement())
+  title       String
+  severity    String   // info | warning | danger
+  category    String
+  source      String
+  active      Boolean  @default(true)
+  area        String
+  details     String
+  isSample    Boolean  @default(true)
+  publishedAt DateTime @default(now())
+}

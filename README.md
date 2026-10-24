@@ -2,7 +2,85 @@
 
 Saheli is a mobile-first web app that helps women plan informed journeys, keep trusted contacts in the loop, and reach help quickly. The first region is Shillong, Meghalaya.
 
-> **Status:** the frontend is feature-complete and runs entirely in the browser. **No backend is connected yet.** Anything that should reach another person (SOS, check-ins, live sharing, reports) is saved in a local **outbox** and is ready for the backend to deliver. See [Backend handoff](#backend-handoff).
+> **Status:** Frontend and Backend are fully integrated! Authentication (Phone OTP + JWT), Profile, Emergency Contacts CRUD, Check-ins with Server-Side Escalation, Live Sharing with Privacy-Preserving Public Links, Area Insights, Route Comparison, Heuristic Safety Assistant, Shelters directory, and Outbox Message Dispatching are live and verified. Safe mock dispatcher is active for emergency delivery.
+
+---
+
+## Hackathon Demo & Quick Start Guide
+
+### 1. Prerequisites
+- **Node.js**: v20.19+ (v22 recommended)
+- **npm** (or pnpm)
+
+### 2. Startup Commands
+
+#### Terminal 1 — Start the Backend API
+```bash
+cd saheli-backend
+npm run build
+npm start
+# Server listens at http://localhost:5000 (API prefix: /api/v1)
+```
+
+#### Terminal 2 — Start the Frontend
+```bash
+cd saheli-main
+npm run dev
+# Frontend runs at http://localhost:5173
+```
+
+### 3. Environment Configuration
+- **Backend (`saheli-backend/.env`)**:
+  ```env
+  PORT=5000
+  NODE_ENV=development
+  API_PREFIX=/api/v1
+  CORS_ORIGIN=http://localhost:5173
+  DATABASE_URL=file:./dev.db
+  JWT_SECRET=saheli_super_secret_development_jwt_key_change_in_production_2026
+  EMERGENCY_DELIVERY_MODE=mock
+  AI_PROVIDER=mock
+  ```
+- **Frontend (`saheli-main/.env`)**:
+  ```env
+  VITE_API_URL=http://localhost:5000/api/v1
+  ```
+
+### 4. Step-by-Step Hackathon Demonstration Flow
+1. **Open Saheli**: Navigate to `http://localhost:5173` on a browser (use device toolbar at mobile width).
+2. **Sign In (Phone OTP Flow)**:
+   - Enter phone number (e.g. `9876543210`) and click **Get OTP**.
+   - Check the backend terminal log for the `[AUTH-DEV-MOCK]` 6-digit code.
+   - Enter the code and verify. JWT token is stored securely in `localStorage`.
+3. **Explore Safety Insights & Explainability**:
+   - Go to **Explore** tab. Select **Police Bazaar**.
+   - Review empirical factors: lighting score, transit schedule, open places, active IMD heavy rain advisory.
+   - Notice the confidence indicator ("High"), freshness status, and "Sample fixture" badge.
+   - Test an unmonitored area to observe the strict "Unknown / Insufficient Data" zero-hallucination behavior.
+4. **Compare Routes with Trade-offs**:
+   - Tap **Route here** or open **Journeys** → **Plan a route** → **Compare routes**.
+   - Toggle departures ("Now", "Evening", "Night").
+   - Notice travel metrics (distance, time) are separated from safety evidence, with trade-off analysis explaining why Route B is shorter while Route A has more open places.
+5. **Manage Trusted Contacts**:
+   - Go to **Contacts** tab. Add a contact (e.g. Sunita Sharma, Sister).
+   - Contact is instantly saved to SQLite database via `POST /api/v1/contacts`.
+6. **Start a Timed Check-in**:
+   - Open **Check-in** from Home or Tools. Start a 15-minute timer.
+   - Check-in session is registered on the backend (`POST /api/v1/checkins`).
+   - Tap **+10 min** to extend or **I'm safe** to complete.
+7. **Demonstrate Emergency SOS**:
+   - Tap the central **SOS** button. View the cancellable countdown ring.
+   - On dispatch, notice the clear disclaimer: *"SIMULATED DEMO ALERT: Logged to backend mock dispatcher. In this demo mode, real carrier SMS and 112 calls are not dispatched."*
+   - Tap **I'm safe now** to trigger `/api/v1/sos/cancel`.
+8. **Demonstrate Live Location Sharing**:
+   - Open **Live sharing** from Home or Profile. Select duration and contacts.
+   - Notice the cryptographically generated **Public Tracking Link** (`/api/v1/sharing/public/:token`).
+   - Open that URL in an incognito window: it shows location without leaking user phone, name, or private contact details. Pause the session: location updates are immediately hidden.
+9. **Consult the AI Safety Assistant**:
+   - Open Safety Assistant (spark icon). Ask: *"What should I do if I feel unsafe while walking home?"*
+   - Response provides actionable de-escalation steps, cites emergency services (112, 1091), and clearly notes heuristic provider status.
+10. **Sign Out**:
+    - Open **Profile** tab and tap **Sign out** to clean up the authenticated session.
 
 ---
 

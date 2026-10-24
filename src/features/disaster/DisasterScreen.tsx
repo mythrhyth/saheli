@@ -6,12 +6,24 @@ import { ContactChips } from "@/components/ContactChips"
 import { ScreenLayout } from "@/components/layout/ScreenLayout"
 import { Badge, Button, Icon, PendingNote, Steps } from "@/components/ui"
 import { FLOOD_GUIDE, LANDSLIDE_GUIDE } from "@/data/guidance"
+import { api } from "@/lib/api"
 import { contactNames, contactsWithRole } from "@/lib/contacts"
 import { getLocation } from "@/lib/device"
 import { formatTime, mapsLink } from "@/lib/format"
 import { queueMessage } from "@/lib/outbox"
 
 type CheckInState = "" | "sending" | "safe" | "help"
+
+type DisasterAlertItem = {
+  id: number
+  title: string
+  severity: "info" | "warning" | "danger"
+  category: string
+  source: string
+  area: string
+  details: string
+  isSample: boolean
+}
 
 export default function DisasterScreen() {
   const { t } = useTranslation()
@@ -20,8 +32,25 @@ export default function DisasterScreen() {
   const { contacts, profile, dismissAlert } = useAppState()
   const [status, setStatus] = useState<CheckInState>("")
   const [sentAt, setSentAt] = useState(0)
+  const [serverAlert, setServerAlert] = useState<DisasterAlertItem | null>(null)
   const checkInRef = useRef<HTMLElement>(null)
   const recipients = contactsWithRole(contacts, "Disaster check-in recipient")
+
+  useEffect(() => {
+    let cancelled = false
+    api
+      .getPublic<{ alerts: DisasterAlertItem[] }>("/alerts?active=true")
+      .then((res) => {
+        if (!cancelled && res?.alerts && res.alerts.length > 0) {
+          setServerAlert(res.alerts[0])
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (focusCheckin) checkInRef.current?.scrollIntoView({ block: "start" })
@@ -47,10 +76,15 @@ export default function DisasterScreen() {
   return (
     <ScreenLayout title={t("guidance")} onBack={back}>
       <div className="alert-banner">
-        <Badge tone="critical">{t("activeAlert")}</Badge>
-        <h2>{t("alert")}</h2>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+          <Badge tone={serverAlert?.severity === "danger" ? "critical" : "limited"}>
+            {serverAlert?.title ? "Active Alert" : t("activeAlert")}
+          </Badge>
+          {serverAlert?.isSample && <Badge tone="limited">Sample advisory</Badge>}
+        </div>
+        <h2>{serverAlert?.title ?? t("alert")}</h2>
         <p>
-          {t("alertMeta")} · {t("sample")}
+          {serverAlert ? `${serverAlert.area} · ${serverAlert.source} · ${serverAlert.details}` : `${t("alertMeta")} · ${t("sample")}`}
         </p>
       </div>
 

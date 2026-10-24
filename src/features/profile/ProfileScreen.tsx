@@ -5,8 +5,10 @@ import { useAppState } from "@/app/state/useAppState"
 import { Button, Icon, type IconName } from "@/components/ui"
 import { APP_VERSION, LANGUAGES, STORAGE_KEYS } from "@/config/constants"
 import { defaultEmergencyPrefs } from "@/config/defaults"
+import { useAuth } from "@/features/auth"
 import { isSharingActive } from "@/features/sharing/sharing"
 import { usePersistedState } from "@/hooks/usePersistedState"
+import { api } from "@/lib/api"
 import { formatDate, initials } from "@/lib/format"
 import type { EmergencyPrefs, OfflinePackMeta } from "@/types"
 import { EditProfileModal } from "./EditProfileModal"
@@ -18,6 +20,7 @@ export default function ProfileScreen() {
   const { t, i18n } = useTranslation()
   const { open, goTab } = useNavigation()
   const { profile, setProfile, contacts, session, displayPrefs, notificationStatus } = useAppState()
+  const { isAuthenticated, logout } = useAuth()
   const [emergency] = usePersistedState<EmergencyPrefs>(STORAGE_KEYS.emergencyPrefs, defaultEmergencyPrefs)
   const [pack] = usePersistedState<OfflinePackMeta | null>(STORAGE_KEYS.offlinePack, null)
   const [editing, setEditing] = useState(false)
@@ -106,13 +109,35 @@ export default function ProfileScreen() {
         </Button>
       ))}
 
+      {isAuthenticated && (
+        <div style={{ marginTop: 24, padding: "0 12px" }}>
+          <Button
+            className="secondary full"
+            onClick={() => {
+              if (confirm("Are you sure you want to sign out?")) {
+                logout()
+              }
+            }}
+          >
+            Sign out
+          </Button>
+        </div>
+      )}
+
       {editing && (
         <EditProfileModal
           profile={profile}
           onCancel={() => setEditing(false)}
-          onSave={(next) => {
+          onSave={async (next) => {
             setProfile(next)
             setEditing(false)
+            if (isAuthenticated) {
+              try {
+                await api.put("/me", { name: next.name, city: next.city })
+              } catch {
+                // Silently fallback to local state
+              }
+            }
           }}
         />
       )}

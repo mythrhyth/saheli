@@ -1,8 +1,9 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigation } from "@/app/navigation/useNavigation"
 import { ScreenLayout } from "@/components/layout/ScreenLayout"
 import { Badge, Button, EmptyState } from "@/components/ui"
 import { SHELTERS, SHELTER_FILTERS } from "@/data/shelters"
+import { api } from "@/lib/api"
 import type { Shelter } from "@/types"
 
 type Filter = (typeof SHELTER_FILTERS)[number]
@@ -21,16 +22,57 @@ export default function ShelterFinderScreen() {
   const { back } = useNavigation()
   const [filters, setFilters] = useState<Filter[]>([])
   const [expanded, setExpanded] = useState<number | null>(null)
+  const [allShelters, setAllShelters] = useState<Shelter[]>(SHELTERS)
+  const [isSample, setIsSample] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+
+    api
+      .getPublic<{ shelters: Array<Shelter & { distanceKm?: number; accessNotes?: string; isSample?: boolean }> }>(
+        "/shelters",
+      )
+      .then((res) => {
+        if (!cancelled && res?.shelters && res.shelters.length > 0) {
+          const mapped: Shelter[] = res.shelters.map((s) => ({
+            id: s.id,
+            name: s.name,
+            type: s.type,
+            status: s.status,
+            distance: s.distanceKm ?? s.distance ?? 1.0,
+            area: s.area,
+            womenOnly: s.womenOnly,
+            accessible: s.accessible,
+            open24: s.open24,
+            facilities: s.facilities,
+            phone: s.phone,
+            access: s.accessNotes ?? s.access ?? "Standard road access",
+          }))
+          setAllShelters(mapped)
+          setIsSample(Boolean(res.shelters[0]?.isSample))
+        }
+      })
+      .catch(() => {
+        // Safe fallback to local fixtures
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const toggleFilter = (f: Filter) => setFilters(filters.includes(f) ? filters.filter((x) => x !== f) : [...filters, f])
   const toggleExpanded = (id: number) => setExpanded(expanded === id ? null : id)
-  const shelters = SHELTERS.filter((s) => filters.every((f) => matches[f](s))).sort((a, b) => a.distance - b.distance)
+  const shelters = allShelters.filter((s) => filters.every((f) => matches[f](s))).sort((a, b) => a.distance - b.distance)
 
   return (
     <ScreenLayout title="Shelter Finder" onBack={back}>
-      <p className="lead">
-        Shelter status is shown as <b>Confirmed</b>, <b>Reported</b> or <b>Unknown</b>. Route access is never assumed.
-      </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <p className="lead" style={{ margin: 0 }}>
+          Shelter status is shown as <b>Confirmed</b>, <b>Reported</b> or <b>Unknown</b>. Route access is never assumed.
+        </p>
+        {isSample && <Badge tone="limited">Sample fixtures</Badge>}
+      </div>
       <div className="chip-wrap">
         {SHELTER_FILTERS.map((f) => (
           <Button

@@ -9,6 +9,7 @@ import { defaultJourneyDefaults } from "@/config/defaults"
 import { useNow } from "@/hooks/useNow"
 import { usePersistedState } from "@/hooks/usePersistedState"
 import { useToast } from "@/hooks/useToast"
+import { api } from "@/lib/api"
 import { contactNames, contactsWithRole } from "@/lib/contacts"
 import { clock, formatTime } from "@/lib/format"
 import { queueMessage } from "@/lib/outbox"
@@ -37,6 +38,11 @@ export default function CheckInScreen() {
         body: `${profile.name || "Your contact"} checked in: I'm safe. ${formatTime(Date.now())}.`,
         recipients: contactNames(recipients),
       })
+      if (checkIn && api.getToken()) {
+        api.patch(`/checkins/${checkIn.id}/safe`).catch(() => {})
+      }
+    } else if (checkIn && api.getToken()) {
+      api.del(`/checkins/${checkIn.id}`).catch(() => {})
     }
     setCheckIn(null)
     showToast(notifySafe ? 'Check-in ended. An "I\'m safe" message was queued.' : "Check-in ended.")
@@ -80,9 +86,23 @@ export default function CheckInScreen() {
         <Button
           className="primary"
           disabled={!recipients.length}
-          onClick={() => {
-            startCheckIn(minutes, defaults.grace, label.trim() || "Check-in")
+          onClick={async () => {
+            const nextCheckIn = startCheckIn(minutes, defaults.grace, label.trim() || "Check-in")
             showToast("Check-in started.")
+            if (api.getToken()) {
+              try {
+                const res = await api.post<{ checkIn: { id: number } }>("/checkins", {
+                  label: nextCheckIn.label,
+                  intervalMinutes: minutes,
+                  graceMinutes: defaults.grace,
+                })
+                if (res?.checkIn?.id) {
+                  setCheckIn({ ...nextCheckIn, id: res.checkIn.id })
+                }
+              } catch {
+                // Keep local state
+              }
+            }
           }}
         >
           <Icon name="clock" />
@@ -100,6 +120,9 @@ export default function CheckInScreen() {
 
   const imSafe = () => {
     if (checkIn.status === "escalated") return end(true)
+    if (api.getToken()) {
+      api.patch(`/checkins/${checkIn.id}/safe`).catch(() => {})
+    }
     startCheckIn(checkIn.interval, checkIn.grace, checkIn.label)
     showToast(`Thanks. Next check-in in ${checkIn.interval} min.`)
   }
@@ -145,6 +168,9 @@ export default function CheckInScreen() {
           <Button
             className="secondary"
             onClick={() => {
+              if (api.getToken()) {
+                api.patch(`/checkins/${checkIn.id}/extend`, { extraMinutes: 10 }).catch(() => {})
+              }
               setCheckIn({ ...checkIn, dueAt: Math.max(checkIn.dueAt, Date.now()) + 10 * 60000, status: "running" })
               showToast("Added 10 minutes.")
             }}

@@ -7,6 +7,7 @@ import { Button, Icon, PendingNote } from "@/components/ui"
 import { STORAGE_KEYS } from "@/config/constants"
 import { defaultEmergencyPrefs } from "@/config/defaults"
 import { usePersistedState } from "@/hooks/usePersistedState"
+import { api } from "@/lib/api"
 import { contactNames, contactsStrictlyWithRole } from "@/lib/contacts"
 import { getLocation, vibrate } from "@/lib/device"
 import { formatTime, mapsLink } from "@/lib/format"
@@ -39,6 +40,17 @@ export default function SosScreen() {
       recipients: contactNames(recipients),
       location: coords,
     })
+    if (api.getToken()) {
+      try {
+        await api.post("/sos", {
+          lat: coords?.lat ?? null,
+          lng: coords?.lng ?? null,
+          message: prefs.message,
+        })
+      } catch {
+        // Safe mock fallback
+      }
+    }
     setPhase("sent")
   }, [prefs.includeLocation, prefs.message, sender, recipients])
 
@@ -89,6 +101,9 @@ export default function SosScreen() {
       body: `${sender} is safe now and has cancelled the SOS alert.`,
       recipients: contactNames(recipients),
     })
+    if (api.getToken()) {
+      api.post("/sos/cancel").catch(() => {})
+    }
     setPhase("resolved")
   }
 
@@ -156,8 +171,8 @@ export default function SosScreen() {
             {updates ? ` · ${updates} location update${updates === 1 ? "" : "s"}` : ""}
           </p>
           <PendingNote>
-            Alert is queued on this device. Automatic delivery starts once the messaging service is connected. If you
-            are in danger, call 112 now.
+            SIMULATED DEMO ALERT: Logged to backend mock dispatcher. In this demo mode, real carrier SMS and 112
+            calls are not dispatched. If you are in real danger, call 112 immediately.
           </PendingNote>
           {prefs.repeatMins > 0 && (
             <p className="center muted small-note">

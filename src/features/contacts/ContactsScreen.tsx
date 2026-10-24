@@ -1,9 +1,11 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigation } from "@/app/navigation/useNavigation"
 import { useAppState } from "@/app/state/useAppState"
 import { ScreenHeader } from "@/components/layout/ScreenLayout"
 import { Button, EmptyState, Toast } from "@/components/ui"
+import { useAuth } from "@/features/auth"
 import { useToast } from "@/hooks/useToast"
+import { api, ApiError } from "@/lib/api"
 import { initials, telHref } from "@/lib/format"
 import { queueMessage } from "@/lib/outbox"
 import type { ContactFormData } from "@/lib/validation"
@@ -14,22 +16,95 @@ import { ContactFormModal } from "./ContactFormModal"
 export default function ContactsScreen() {
   const { open } = useNavigation()
   const { contacts, setContacts, profile } = useAppState()
+  const { isAuthenticated } = useAuth()
   const [editing, setEditing] = useState<Contact | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+  const [syncLoading, setSyncLoading] = useState(false)
   const [toast, showToast] = useToast(5000)
+
+  // On mount, sync contacts from the server if authenticated.
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    let cancelled = false
+    setSyncLoading(true)
+
+    api
+      .get<Contact[]>("/contacts")
+      .then((serverContacts) => {
+        if (cancelled) return
+        // Merge: server is source of truth; keep any local-only contacts (id not on server).
+        const serverIds = new Set(serverContacts.map((c) => c.id))
+        const localOnly = contacts.filter((c) => !serverIds.has(c.id))
+        setContacts([...serverContacts, ...localOnly])
+      })
+      .catch((err) => {
+        if (cancelled) return
+        const msg = err instanceof ApiError ? err.message : "Could not sync with server"
+        showToast(`${msg}. Using local contacts.`)
+      })
+      .finally(() => {
+        if (!cancelled) setSyncLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated])
 
   const openForm = (contact: Contact | null = null) => {
     setEditing(contact)
     setFormOpen(true)
   }
 
-  const save = (data: ContactFormData) => {
-    setContacts(
-      editing
-        ? contacts.map((c) => (c.id === editing.id ? { ...c, ...data } : c))
-        : [...contacts, { id: Date.now(), ...data }],
-    )
-    setFormOpen(false)
+  const save = async (data: ContactFormData) => {
+    if (editing) {
+      // Edit existing contact
+      const optimistic = contacts.map((c) => (c.id === editing.id ? { ...c, ...data } : c))
+      setContacts(optimistic)
+      setFormOpen(false)
+
+      if (isAuthenticated) {
+        try {
+          await api.put<Contact>(`/contacts/${editing.id}`, data)
+        } catch {
+          showToast("Could not sync with server — contact saved locally.")
+        }
+      }
+    } else {
+      // Add new contact — optimistic with a temporary local id
+      const tempId = Date.now()
+      const optimistic: Contact = { id: tempId, ...data }
+      setContacts([...contacts, optimistic])
+      setFormOpen(false)
+
+      if (isAuthenticated) {
+        try {
+          const created = await api.post<Contact>("/contacts", data)
+          // Replace temp id with real server id
+          setContacts(contacts.map((c) => (c.id === tempId ? created : c)).concat(
+            contacts.find((c) => c.id === tempId) ? [] : [created],
+          ))
+        } catch {
+          showToast("Could not sync with server — contact saved locally.")
+        }
+      }
+    }
+  }
+
+  const remove = async (contact: Contact) => {
+    if (!confirm(`Remove ${contact.name}?`)) return
+
+    setContacts(contacts.filter((c) => c.id !== contact.id))
+
+    if (isAuthenticated) {
+      try {
+        await api.del(`/contacts/${contact.id}`)
+      } catch {
+        showToast("Could not sync with server — contact removed locally.")
+      }
+    }
   }
 
   const sendTest = (contact: Contact) => {
@@ -42,14 +117,16 @@ export default function ContactsScreen() {
     showToast(`Test message for ${contact.name} queued. It will be delivered once the messaging service is connected.`)
   }
 
-  const remove = (contact: Contact) => {
-    if (confirm(`Remove ${contact.name}?`)) setContacts(contacts.filter((c) => c.id !== contact.id))
-  }
-
   return (
     <main className="screen-content feature-page">
       <ScreenHeader title="Trusted contacts" eyebrow="SAHELI" />
       <Toast text={toast} />
+
+      {syncLoading && (
+        <p style={{ textAlign: "center", color: "var(--muted)", fontSize: 12, marginBottom: 12 }}>
+          Syncing contacts…
+        </p>
+      )}
 
       {!contacts.length ? (
         <EmptyState
