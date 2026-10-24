@@ -1,0 +1,60 @@
+import type { Shelter } from "@/types"
+
+/** SAMPLE DATA: replace with `GET /shelters` once the backend exists. */
+export const SHELTERS: Shelter[] = [
+  {
+    id: 1,
+    name: "One Stop Centre (Sakhi)",
+    type: "Government support centre",
+    status: "Confirmed",
+    distance: 1.8,
+    area: "East Khasi Hills",
+    womenOnly: true,
+    accessible: true,
+    open24: true,
+    facilities: ["Counselling", "Legal aid", "Medical referral", "Temporary stay"],
+    phone: "181",
+    access: "Road access unknown during the rain alert",
+  },
+  {
+    id: 2,
+    name: "District relief camp",
+    type: "Disaster relief camp",
+    status: "Reported",
+    distance: 2.6,
+    area: "Laitumkhrah",
+    womenOnly: false,
+    accessible: true,
+    open24: true,
+    facilities: ["Separate women's area", "Drinking water", "First aid"],
+    access: "Reported open by community, not confirmed",
+  },
+  {
+    id: 3,
+    name: "Working women's hostel",
+    type: "Hostel",
+    status: "Unknown",
+    distance: 3.4,
+    area: "Polo",
+    womenOnly: true,
+    accessible: false,
+    open24: false,
+    facilities: ["Beds", "Security desk"],
+    access: "Availability unknown",
+  },
+  {
+    id: 4,
+    name: "Community hall shelter",
+    type: "Community shelter",
+    status: "Reported",
+    distance: 4.1,
+    area: "Malki",
+    womenOnly: false,
+    accessible: false,
+    open24: false,
+    facilities: ["Drinking water", "Separate sanitation"],
+    access: "Steep approach road",
+  },
+]
+
+export const SHELTER_FILTERS = ["Women only", "Accessible", "Open 24h", "Confirmed only"] as const
