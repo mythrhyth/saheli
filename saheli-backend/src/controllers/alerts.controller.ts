@@ -46,7 +46,7 @@ export async function getDisasterAlerts(req: Request, res: Response) {
     orderBy: { publishedAt: "desc" },
   })
 
-  const formattedAlerts = alerts.map((alert) => ({
+  const formattedAlerts = alerts.map((alert: any) => ({
     id: alert.id,
     title: alert.title,
     severity: alert.severity,

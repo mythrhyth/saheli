@@ -1,0 +1,57 @@
+/* Design tokens (light + dark themes) and element defaults. */
+:root {
+  --bg: #faf8f7;
+  --surface: #ffffff;
+  --surface-2: #f3eeef;
+  --text: #29242a;
+  --muted: #797078;
+  --accent: #c77c96;
+  --accent-dark: #ad637f;
+  --accent-soft: #f4e4ea;
+  --border: #eae3e5;
+  --success: #347c67;
+  --warning: #a96d2d;
+  --critical: #c83f50;
+  --critical-bg: #fbeaec;
+  --shadow: 0 10px 35px rgba(47, 34, 41, 0.08);
+  --map: #e9e6e1;
+  --road: #fff;
+}
+:root[data-theme="dark"] {
+  --bg: #171519;
+  --surface: #211d22;
+  --surface-2: #302832;
+  --text: #f5eff2;
+  --muted: #b8adb5;
+  --accent: #d99aaf;
+  --accent-dark: #e6b5c6;
+  --accent-soft: #382832;
+  --border: #3a323a;
+  --success: #85c7ae;
+  --warning: #e4b574;
+  --critical: #ff727b;
+  --critical-bg: #3b2027;
+  --shadow: 0 10px 35px rgba(0, 0, 0, 0.25);
+  --map: #28272b;
+  --road: #3b3940;
+}
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Inter, sans-serif;
+  }
+  button {
+    cursor: pointer;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: Manrope, Inter, sans-serif;
+    letter-spacing: -0.035em;
+  }
+}

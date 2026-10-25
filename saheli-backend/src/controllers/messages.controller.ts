@@ -121,8 +121,8 @@ export async function triggerSos(req: AuthenticatedRequest, res: Response) {
 
   const sosContacts =
     user?.contacts
-      .filter((c) => c.roles.includes("SOS recipient"))
-      .map((c) => c.name) ?? []
+      .filter((c: any) => c.roles.includes("SOS recipient"))
+      .map((c: any) => c.name) ?? []
 
   const recipients = sosContacts.length > 0 ? sosContacts : ["All emergency contacts"]
 
@@ -160,7 +160,7 @@ export async function cancelSos(req: AuthenticatedRequest, res: Response) {
   })
 
   const userName = user?.name || "Saheli User"
-  const contactNames = user?.contacts.map((c) => c.name) ?? []
+  const contactNames = user?.contacts.map((c: any) => c.name) ?? []
 
   // Create an explicit "sos-cancel" follow-up WITHOUT erasing previous SOS records
   const cancelRecord = await NotifierService.dispatch({
@@ -190,7 +190,7 @@ export async function getMessages(req: AuthenticatedRequest, res: Response) {
     take: 50,
   })
 
-  const formatted = messages.map((m) => {
+  const formatted = messages.map((m: any) => {
     let recipients: string[] = []
     try {
       recipients = JSON.parse(m.recipients)

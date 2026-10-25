@@ -52,7 +52,7 @@ export async function getShelters(req: Request, res: Response) {
     orderBy: { distanceKm: "asc" },
   })
 
-  const formattedShelters = shelters.map((shelter) => {
+  const formattedShelters = shelters.map((shelter: any) => {
     let parsedFacilities: string[] = []
     try {
       parsedFacilities = JSON.parse(shelter.facilities)

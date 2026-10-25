@@ -23,7 +23,7 @@ export async function getContacts(req: AuthenticatedRequest, res: Response) {
     orderBy: { createdAt: "asc" },
   })
 
-  const formatted = contacts.map((c) => {
+  const formatted = contacts.map((c: any) => {
     let roles: string[] = []
     try {
       roles = JSON.parse(c.roles)

@@ -72,7 +72,7 @@ export class CheckInService {
 
     // Fetch user contacts to notify
     const contacts = await prisma.emergencyContact.findMany({ where: { userId } })
-    const contactNames = contacts.map((c) => c.name)
+    const contactNames = contacts.map((c: any) => c.name)
 
     await NotifierService.dispatch({
       userId,
@@ -169,7 +169,7 @@ export class CheckInService {
           include: { contacts: true },
         })
 
-        const contactNames = user?.contacts.map((c) => c.name) ?? []
+        const contactNames = user?.contacts.map((c: any) => c.name) ?? []
         const userName = user?.name || "Saheli User"
 
         // 3. Dispatch safe mock missed-check-in escalation
